@@ -396,6 +396,8 @@ az ad sp list --display-name $ACR_NAME-pull --query [].appId --output tsv
 2a2955f3-4248-43af-812b-1c3563d3b578
 
 *** so zsh does not work ... must be the --query
+    --query                  : JMESPath query string. See http://jmespath.org/ for more information
+                               and examples.
 
 3. 
 az keyvault secret set \
@@ -544,7 +546,7 @@ az acr task create \
     --registry $ACR_NAME \
     --name taskhelloworld \
     --image helloworld:{{.Run.ID}} \
-    --context https://github.com/$GIT_USER/acr-build-helloworld-node.git#main \
+    --context https://github.com/$GIT_USER/acr-build-helloworld-node.git#master \
     --file Dockerfile \
     --git-access-token $GIT_PAT
 
@@ -570,11 +572,46 @@ ca1                       linux       Succeeded  Manual     2021-07-24T00:55:41Z
 az acr task logs --registry $ACR_NAME --run-id ca3
 *** works ***
 
+git push  origin master
+
+az acr task list-runs --registry $ACR_NAME --output table
+RUN ID    TASK            PLATFORM    STATUS     TRIGGER    STARTED               DURATION
+--------  --------------  ----------  ---------  ---------  --------------------  ----------
+ca5       taskhelloworld  linux       Running    Commit     2021-07-24T09:31:19Z
+ca4       taskhelloworld  linux       Succeeded  Manual     2021-07-24T09:29:35Z  00:00:24
+ca3       taskhelloworld  linux       Succeeded  Manual     2021-07-24T09:22:26Z  00:00:18
+ca2       taskhelloworld  linux       Succeeded  Manual     2021-07-24T09:11:04Z  00:00:28
+ca1                       linux       Succeeded  Manual     2021-07-24T00:55:41Z  00:00:31
+MacBook-Pro:acr-build-helloworld-node kthomson$
+
 
 
 =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-# 
+# Automate container image builds when a base image is updated 
+https://docs.microsoft.com/en-us/azure/container-registry/container-registry-tutorial-base-image-update
 
+az acr build --registry $ACR_NAME --image baseimages/node:15-alpine --file Dockerfile-base .
+
+
+new task to trigger on base image change
+az acr task create \
+    --registry $ACR_NAME \
+    --name baseexample1 \
+    --image helloworld:{{.Run.ID}} \
+    --arg REGISTRY_NAME=$ACR_NAME.azurecr.io \
+    --context https://github.com/$GIT_USER/acr-build-helloworld-node.git#master \
+    --file Dockerfile-app \
+    --git-access-token $GIT_PAT
+
+Operation returned an invalid status 'Conflict'
+
+
+
+edit Dockerfile-base and add "a"
+ENV NODE_VERSION 15.2.1a
+
+then rebuild base image
+az acr build --registry $ACR_NAME --image baseimages/node:15-alpine --file Dockerfile-base .
 
 =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 # 
